@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultimate RPS with Shoot! Countdown 🧠</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; background: #f0f8ff; padding: 30px; }
+  h1 { color: #333; }
+  button {
+    font-size: 16px; padding: 10px 20px; margin: 5px;
+    cursor: pointer; border-radius: 8px; border: none;
+    transition: transform 0.2s;
+  }
+  button:hover { transform: scale(1.1); }
+  #result { margin-top: 20px; font-size: 20px; }
+  #scoreboard { margin-top: 10px; font-size: 18px; }
+  #history { margin-top: 10px; font-size: 16px; }
+  #chartContainer { display: none; margin-top: 20px; }
+  #achievements { margin-top: 15px; font-size: 16px; color: #d6336c; }
+</style>
+</head>
+<body>
+
+<h1>Ultimate RPSLS 🧠 - Shoot Countdown!</h1>
+
+<div>
+  <label>Difficulty: 
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+  </label>
+  <label>Mode: 
+    <select id="mode" onchange="setupButtons()">
+      <option value="rps" selected>Normal (RPS)</option>
+      <option value="rpsls">RPSLS</option>
+    </select>
+  </label>
+</div>
+
+<div id="buttonsContainer"></div>
+
+<div id="countdown"></div>
+<div id="result"></div>
+<div id="scoreboard">Wins: 0 | Losses: 0 | Ties: 0</div>
+<div id="history"><strong>History:</strong> </div>
+<div id="achievements"><strong>Achievements:</strong> None</div>
+<button onclick="toggleChart()">Show Stats 📊</button>
+<button onclick="resetGame()">Reset 🔄</button>
+
+<div id="chartContainer">
+  <canvas id="chart" width="400" height="200"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let mode="rps";
+let choices=["rock","paper","scissors"];
+let userHistory={};
+let rounds=[];
+let wins=0, losses=0, ties=0;
+let lastUserMoves=[];
+let streak=0, bestStreak=0;
+let achievementsUnlocked=[];
+
+// Chart setup
+const ctx=document.getElementById('chart').getContext('2d');
+const chart=new Chart(ctx,{
+  type:'bar',
+  data:{
+    labels:choices,
+    datasets:[
+      {label:'Your Moves', data:[0,0,0], backgroundColor:'#4ECDC4'},
+      {label:'Wins', data:[0,0,0], backgroundColor:'#FF6B6B'},
+      {label:'Losses', data:[0,0,0], backgroundColor:'#FFD93D'}
+    ]
+  },
+  options:{ responsive:true }
+});
+
+// Buttons
+function setupButtons(){
+  mode=document.getElementById("mode").value;
+  choices=(mode==="rps")?["rock","paper","scissors"]:["rock","paper","scissors","lizard","spock"];
+  userHistory={}; rounds=[]; lastUserMoves=[]; wins=losses=ties=streak=bestStreak=0; achievementsUnlocked=[];
+  updateAchievements();
+  document.getElementById("buttonsContainer").innerHTML="";
+  choices.forEach(choice=>{
+    userHistory[choice]=0;
+    const btn=document.createElement("button");
+    btn.innerText=choice.charAt(0).toUpperCase()+choice.slice(1);
+    btn.onclick=()=>playCountdown(choice);
+    document.getElementById("buttonsContainer").appendChild(btn);
+  });
+  updateChart();
+  document.getElementById("result").innerHTML="";
+  document.getElementById("scoreboard").innerText="Wins: 0 | Losses: 0 | Ties: 0";
+  document.getElementById("history").innerHTML="<strong>History:</strong>";
+  document.getElementById("countdown").innerHTML="";
+}
+
+// Countdown mechanic
+function playCountdown(userChoice){
+  document.getElementById("countdown").innerHTML="<b>3</b>";
+  let count=3;
+  const interval=setInterval(()=>{
+    count--;
+    if(count>0) document.getElementById("countdown").innerHTML=`<b>${count}</b>`;
+    else{
+      clearInterval(interval);
+      document.getElementById("countdown").innerHTML="<b>SHOOT! ✊✋✌️</b>";
+      setTimeout(()=>play(userChoice),500);
+    }
+  },500);
+}
+
+// AI logic
+function aiPredictMove(userChoice){
+  const difficulty=document.getElementById("difficulty").value;
+  if(difficulty==="easy") return choices[Math.floor(Math.random()*choices.length)];
+  if(difficulty==="medium"){
+    let predicted=Object.keys(userHistory).reduce((a,b)=>userHistory[a]>=userHistory[b]?a:b);
+    return beatMove(predicted);
+  }
+  if(difficulty==="hard"){
+    if(mode==="rps" && lastUserMoves.length>=2){
+      let pattern=lastUserMoves.slice(-2).join("-");
+      let prediction={"rock-paper":"scissors","paper-scissors":"rock","scissors-rock":"paper"}[pattern];
+      if(prediction) return beatMove(prediction);
+    }
+    let predicted=Object.keys(userHistory).reduce((a,b)=>userHistory[a]>=userHistory[b]?a:b);
+    return beatMove(predicted);
+  }
+  return choices[Math.floor(Math.random()*choices.length)];
+}
+
+// Beat move
+function beatMove(move){
+  if(mode==="rps"){
+    if(move==="rock") return "paper";
+    if(move==="paper") return "scissors";
+    return "rock";
+  } else {
+    switch(move){
+      case "rock": return ["paper","spock"][Math.floor(Math.random()*2)];
+      case "paper": return ["scissors","lizard"][Math.floor(Math.random()*2)];
+      case "scissors": return ["rock","spock"][Math.floor(Math.random()*2)];
+      case "lizard": return ["rock","scissors"][Math.floor(Math.random()*2)];
+      case "spock": return ["paper","lizard"][Math.floor(Math.random()*2)];
+    }
+  }
+}
+
+// Play round
+function play(userChoice){
+  lastUserMoves.push(userChoice);
+  if(lastUserMoves.length>3) lastUserMoves.shift();
+  userHistory[userChoice]++;
+  const aiChoice=aiPredictMove(userChoice);
+
+  let outcome="";
+  if(userChoice===aiChoice){ outcome="tie"; ties++; streak=0; }
+  else if((mode==="rps" && ((userChoice==="rock"&&aiChoice==="scissors")||(userChoice==="paper"&&aiChoice==="rock")||(userChoice==="scissors"&&aiChoice==="paper")))||
+          (mode==="rpsls" && winsAgainst(userChoice).includes(aiChoice))){ outcome="win"; wins++; streak++; if(streak>bestStreak) bestStreak=streak; }
+  else { outcome="lose"; losses++; streak=0; }
+
+  rounds.push(`You:${userChoice}, AI:${aiChoice}, Result:${outcome}`);
+  document.getElementById("result").innerHTML=`You chose <b>${userChoice}</b>, AI chose <b>${aiChoice}</b>.<br><b>${outcome.toUpperCase()}!</b>`;
+  document.getElementById("scoreboard").innerText=`Wins: ${wins} | Losses: ${losses} | Ties: ${ties}`;
+  document.getElementById("history").innerHTML=`<strong>History:</strong> ${rounds.slice(-5).join(" | ")}`;
+
+  updateAchievements();
+  updateChart();
+  playSound(outcome);
+  if(outcome==="win") runConfetti();
+}
+
+// RPSLS win logic
+function winsAgainst(choice){
+  switch(choice){
+    case "rock": return ["scissors","lizard"];
+    case "paper": return ["rock","spock"];
+    case "scissors": return ["paper","lizard"];
+    case "lizard": return ["paper","spock"];
+    case "spock": return ["rock","scissors"];
+  }
+}
+
+// Chart update
+function updateChart(){
+  chart.data.labels=choices;
+  chart.data.datasets[0].data=choices.map(c=>userHistory[c]||0);
+  chart.data.datasets[1].data=choices.map(c=>rounds.filter(r=>r.includes(`You:${c}`)&&r.includes("win")).length);
+  chart.data.datasets[2].data=choices.map(c=>rounds.filter(r=>r.includes(`You:${c}`)&&r.includes("lose")).length);
+  chart.update();
+}
+
+// Confetti minimal
+function runConfetti(){
+  const colors=['#ff0a54','#ff477e','#ff85a1','#fbb1b1','#f9bec7'];
+  for(let i=0;i<5;i++){
+    const div=document.createElement('div');
+    div.style.position='fixed';
+    div.style.width='8px';
+    div.style.height='8px';
+    div.style.background=colors[Math.floor(Math.random()*colors.length)];
+    div.style.top=Math.random()*window.innerHeight+'px';
+    div.style.left=Math.random()*window.innerWidth+'px';
+    div.style.opacity=Math.random();
+    document.body.appendChild(div);
+    setTimeout(()=>div.remove(),500);
+  }
+}
+
+// Sounds
+function playSound(outcome){
+  let src="";
+  if(outcome==="win") src="https://www.soundjay.com/button/sounds/button-3.mp3";
+  else if(outcome==="lose") src="https://www.soundjay.com/button/sounds/button-10.mp3";
+  else src="https://www.soundjay.com/button/sounds/button-09.mp3";
+  const audio=new Audio(src); audio.play();
+}
+
+// Achievements
+function updateAchievements(){
+  achievementsUnlocked=[];
+  if(bestStreak>=3) achievementsUnlocked.push(`🔥 ${bestStreak}-win streak!`);
+  if(wins>=5) achievementsUnlocked.push("🏆 5 wins achieved!");
+  document.getElementById("achievements").innerHTML=`<strong>Achievements:</strong> ${achievementsUnlocked.join(", ") || "None"}`;
+}
+
+function toggleChart(){
+  const container=document.getElementById("chartContainer");
+  container.style.display=container.style.display==="none"? "block":"none";
+}
+
+function resetGame(){
+  setupButtons();
+}
+
+setupButtons();
+</script>
+</body>
+</html>
